@@ -1,0 +1,6 @@
+{
+  "name": "HostelEase",
+  "description": "Verified student PG and hostel discovery, side-by-side comparison, automated booking workflows, daily campus services, and verified student reviews in Dehradun.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

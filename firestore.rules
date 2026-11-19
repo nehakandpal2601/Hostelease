@@ -1,0 +1,414 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default deny everything
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Global Primitives & Helpers
+    // -------------------------------------------------------------------------
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isEmailVerified() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'nehakandpal2601@gmail.com' ||
+        request.auth.token.email == 'neha.0251mba356@dgu.ac.in'
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validation Blueprints
+    // -------------------------------------------------------------------------
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'university', 'emailVerified', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'role', 'university', 'courseYear', 'photoURL', 'emailVerified', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 80
+        && data.role in ['student', 'owner']
+        && data.university is string && data.university.size() >= 2 && data.university.size() <= 100
+        && (!('courseYear' in data) || (data.courseYear is string && data.courseYear.size() <= 40))
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.emailVerified is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPrivateContact(data) {
+      return data.keys().hasAll(['email', 'phone', 'updatedAt'])
+        && data.keys().hasOnly(['email', 'phone', 'guardianPhone', 'updatedAt'])
+        && data.email is string && data.email.size() <= 120
+        && data.phone is string && data.phone.size() <= 24
+        && (!('guardianPhone' in data) || (data.guardianPhone is string && data.guardianPhone.size() <= 24))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStringArray(arr, maxLen) {
+      return arr is list && arr.size() <= maxLen && (arr.size() == 0 || (arr[0] is string && arr[0].size() <= 60));
+    }
+
+    function isValidListing(data) {
+      return data.keys().hasAll([
+          'ownerId', 'ownerName', 'name', 'locality', 'nearCampus', 'distanceKm',
+          'gender', 'roomType', 'monthlyRent', 'securityDeposit', 'availableBeds',
+          'safetyScore', 'verificationStatus', 'isFeatured', 'imageUrl',
+          'safetyFeatures', 'facilities', 'houseRules', 'description',
+          'avgRating', 'reviewCount', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'ownerName', 'name', 'locality', 'nearCampus', 'distanceKm',
+          'gender', 'roomType', 'monthlyRent', 'securityDeposit', 'availableBeds',
+          'safetyScore', 'verificationStatus', 'isFeatured', 'imageUrl',
+          'safetyFeatures', 'facilities', 'houseRules', 'description',
+          'avgRating', 'reviewCount', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerName is string && data.ownerName.size() >= 2 && data.ownerName.size() <= 80
+        && data.name is string && data.name.size() >= 3 && data.name.size() <= 100
+        && data.locality in ['Clement Town', 'Dalanwala', 'Rajpur Road', 'Prem Nagar', 'Bidholi', 'Patel Nagar']
+        && data.nearCampus is string && data.nearCampus.size() >= 2 && data.nearCampus.size() <= 80
+        && data.distanceKm is number && data.distanceKm >= 0 && data.distanceKm <= 30
+        && data.gender in ['Boys', 'Girls', 'Co-ed']
+        && data.roomType in ['Single Studio', 'Twin Sharing', 'Triple Sharing']
+        && data.monthlyRent is number && data.monthlyRent >= 2000 && data.monthlyRent <= 50000
+        && data.securityDeposit is number && data.securityDeposit >= 0 && data.securityDeposit <= 100000
+        && data.availableBeds is number && data.availableBeds >= 0 && data.availableBeds <= 500
+        && data.safetyScore is number && data.safetyScore >= 1 && data.safetyScore <= 10
+        && data.verificationStatus in ['Verified', 'Pending Verification']
+        && data.isFeatured is bool
+        && data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 500
+        && isValidStringArray(data.safetyFeatures, 10)
+        && isValidStringArray(data.facilities, 14)
+        && data.houseRules is string && data.houseRules.size() <= 400
+        && data.description is string && data.description.size() <= 600
+        && data.avgRating is number && data.avgRating >= 0 && data.avgRating <= 5
+        && data.reviewCount is number && data.reviewCount >= 0 && data.reviewCount <= 100000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidReview(data, listingId) {
+      return data.keys().hasAll([
+          'listingId', 'authorId', 'authorName', 'authorUniversity',
+          'overallRating', 'safetyRating', 'cleanlinessRating', 'foodWifiRating',
+          'valueRating', 'comment', 'verifiedResident', 'bookingId', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'listingId', 'authorId', 'authorName', 'authorUniversity',
+          'overallRating', 'safetyRating', 'cleanlinessRating', 'foodWifiRating',
+          'valueRating', 'comment', 'verifiedResident', 'bookingId', 'createdAt'
+        ])
+        && data.listingId == listingId
+        && isValidId(data.authorId)
+        && data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 80
+        && data.authorUniversity is string && data.authorUniversity.size() >= 2 && data.authorUniversity.size() <= 100
+        && data.overallRating is number && data.overallRating >= 1 && data.overallRating <= 5
+        && data.safetyRating is number && data.safetyRating >= 1 && data.safetyRating <= 5
+        && data.cleanlinessRating is number && data.cleanlinessRating >= 1 && data.cleanlinessRating <= 5
+        && data.foodWifiRating is number && data.foodWifiRating >= 1 && data.foodWifiRating <= 5
+        && data.valueRating is number && data.valueRating >= 1 && data.valueRating <= 5
+        && data.comment is string && data.comment.size() >= 10 && data.comment.size() <= 800
+        && data.verifiedResident is bool
+        && data.bookingId is string && data.bookingId.size() <= 128
+        && data.createdAt is timestamp;
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll([
+          'studentId', 'studentName', 'studentUniversity', 'studentPhone',
+          'listingId', 'listingName', 'ownerId', 'moveInDate', 'roomType',
+          'monthlyRent', 'bookingType', 'status', 'commissionInr',
+          'variableCostInr', 'netContributionInr', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'studentId', 'studentName', 'studentUniversity', 'studentPhone',
+          'listingId', 'listingName', 'ownerId', 'moveInDate', 'roomType',
+          'monthlyRent', 'bookingType', 'status', 'commissionInr',
+          'variableCostInr', 'netContributionInr', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.studentId)
+        && data.studentName is string && data.studentName.size() >= 2 && data.studentName.size() <= 80
+        && data.studentUniversity is string && data.studentUniversity.size() >= 2 && data.studentUniversity.size() <= 100
+        && data.studentPhone is string && data.studentPhone.size() >= 6 && data.studentPhone.size() <= 24
+        && isValidId(data.listingId)
+        && data.listingName is string && data.listingName.size() >= 2 && data.listingName.size() <= 100
+        && isValidId(data.ownerId)
+        && data.moveInDate is string && data.moveInDate.size() >= 4 && data.moveInDate.size() <= 30
+        && data.roomType in ['Single Studio', 'Twin Sharing', 'Triple Sharing']
+        && data.monthlyRent is number && data.monthlyRent >= 2000 && data.monthlyRent <= 50000
+        && data.bookingType in ['Schedule Visit', 'Reserve Bed']
+        && data.status in ['Pending Visit', 'Visit Scheduled', 'Confirmed', 'Completed', 'Cancelled']
+        && data.commissionInr is number && data.commissionInr >= 0 && data.commissionInr <= 10000
+        && data.variableCostInr is number && data.variableCostInr >= 0 && data.variableCostInr <= 5000
+        && data.netContributionInr is number && data.netContributionInr >= 0 && data.netContributionInr <= 10000
+        && data.notes is string && data.notes.size() <= 400
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidServiceOrder(data) {
+      return data.keys().hasAll([
+          'studentId', 'studentName', 'campusArea', 'serviceCategory',
+          'planName', 'monthlyPriceInr', 'scheduleSlot', 'status', 'notes',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'studentId', 'studentName', 'campusArea', 'serviceCategory',
+          'planName', 'monthlyPriceInr', 'scheduleSlot', 'status', 'notes',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.studentId)
+        && data.studentName is string && data.studentName.size() >= 2 && data.studentName.size() <= 80
+        && data.campusArea is string && data.campusArea.size() >= 2 && data.campusArea.size() <= 80
+        && data.serviceCategory in ['Tiffin & Meals', 'Campus Laundry', 'Room Cleaning', 'Basic Repairs']
+        && data.planName is string && data.planName.size() >= 2 && data.planName.size() <= 100
+        && data.monthlyPriceInr is number && data.monthlyPriceInr >= 100 && data.monthlyPriceInr <= 20000
+        && data.scheduleSlot is string && data.scheduleSlot.size() >= 2 && data.scheduleSlot.size() <= 80
+        && data.status in ['Active', 'Scheduled', 'Completed', 'Cancelled']
+        && data.notes is string && data.notes.size() <= 300
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isSignedIn() && request.auth.uid == adminId;
+      allow list, write: if false;
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isValidId(userId)
+        && isEmailVerified()
+        && isOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == request.auth.uid
+        && incoming().emailVerified == request.auth.token.email_verified
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(userId)
+        && isEmailVerified()
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (isOwner(userId) && incoming().role == existing().role && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'university', 'courseYear', 'photoURL', 'updatedAt']))
+        );
+
+      allow delete: if false;
+
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+        allow create, update: if isValidId(userId)
+          && isValidId(docId)
+          && docId == 'contact'
+          && isEmailVerified()
+          && (isOwner(userId) || isAdmin())
+          && isValidPrivateContact(incoming())
+          && incoming().updatedAt == request.time;
+        allow delete: if false;
+      }
+    }
+
+    match /listings/{listingId} {
+      allow get: if isValidId(listingId);
+      allow list: if true;
+
+      allow create: if isValidId(listingId)
+        && isEmailVerified()
+        && isValidListing(incoming())
+        && incoming().ownerId == request.auth.uid
+        && incoming().avgRating == 0
+        && incoming().reviewCount == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (isAdmin() || incoming().verificationStatus == 'Pending Verification');
+
+      allow update: if isValidId(listingId)
+        && isEmailVerified()
+        && isValidListing(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().ownerId == request.auth.uid
+            && incoming().verificationStatus == existing().verificationStatus
+            && incoming().avgRating == existing().avgRating
+            && incoming().reviewCount == existing().reviewCount
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'nearCampus', 'distanceKm', 'monthlyRent', 'securityDeposit',
+              'availableBeds', 'safetyFeatures', 'facilities', 'houseRules',
+              'description', 'isFeatured', 'updatedAt'
+            ])
+          ) ||
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['avgRating', 'reviewCount', 'updatedAt'])
+            && incoming().reviewCount == existing().reviewCount + 1
+          )
+        );
+
+      allow delete: if isValidId(listingId) && isAdmin();
+
+      match /reviews/{reviewId} {
+        allow get: if isValidId(listingId) && isValidId(reviewId);
+        allow list: if true;
+
+        allow create: if isValidId(listingId)
+          && isValidId(reviewId)
+          && isEmailVerified()
+          && isValidReview(incoming(), listingId)
+          && incoming().authorId == request.auth.uid
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/listings/$(listingId))
+          && (
+            isAdmin() ||
+            incoming().verifiedResident == false ||
+            (
+              incoming().verifiedResident == true
+              && incoming().bookingId != ''
+              && exists(/databases/$(database)/documents/bookings/$(incoming().bookingId))
+              && get(/databases/$(database)/documents/bookings/$(incoming().bookingId)).data.studentId == request.auth.uid
+              && get(/databases/$(database)/documents/bookings/$(incoming().bookingId)).data.listingId == listingId
+              && get(/databases/$(database)/documents/bookings/$(incoming().bookingId)).data.status in ['Confirmed', 'Completed']
+            )
+          );
+
+        allow update: if false;
+        allow delete: if isValidId(listingId) && isValidId(reviewId) && (isAdmin() || (isEmailVerified() && existing().authorId == request.auth.uid));
+      }
+    }
+
+    match /bookings/{bookingId} {
+      allow get: if isValidId(bookingId) && isSignedIn() && (
+        existing().studentId == request.auth.uid ||
+        existing().ownerId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow list: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        resource.data.ownerId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow create: if isValidId(bookingId)
+        && isEmailVerified()
+        && isValidBooking(incoming())
+        && incoming().studentId == request.auth.uid
+        && incoming().status == 'Pending Visit'
+        && incoming().commissionInr == 0
+        && incoming().variableCostInr == 250
+        && incoming().netContributionInr == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/listings/$(incoming().listingId))
+        && get(/databases/$(database)/documents/listings/$(incoming().listingId)).data.ownerId == incoming().ownerId;
+
+      allow update: if isValidId(bookingId)
+        && isEmailVerified()
+        && isValidBooking(incoming())
+        && incoming().studentId == existing().studentId
+        && incoming().ownerId == existing().ownerId
+        && incoming().listingId == existing().listingId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            !(existing().status in ['Completed', 'Cancelled'])
+            && (
+              (
+                existing().studentId == request.auth.uid
+                && incoming().status == 'Cancelled'
+                && incoming().commissionInr == 0
+                && incoming().netContributionInr == 0
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'notes', 'updatedAt'])
+              ) ||
+              (
+                existing().ownerId == request.auth.uid
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'commissionInr', 'netContributionInr', 'notes', 'updatedAt'])
+                && (
+                  (existing().status == 'Pending Visit' && incoming().status in ['Visit Scheduled', 'Confirmed', 'Cancelled']) ||
+                  (existing().status == 'Visit Scheduled' && incoming().status in ['Confirmed', 'Cancelled']) ||
+                  (existing().status == 'Confirmed' && incoming().status in ['Completed', 'Cancelled'])
+                )
+                && (
+                  (incoming().status in ['Confirmed', 'Completed'] && incoming().commissionInr == 1000 && incoming().netContributionInr == 750) ||
+                  (!(incoming().status in ['Confirmed', 'Completed']) && incoming().commissionInr == 0 && incoming().netContributionInr == 0)
+                )
+              )
+            )
+          )
+        );
+
+      allow delete: if isValidId(bookingId) && isAdmin();
+    }
+
+    match /serviceOrders/{orderId} {
+      allow get: if isValidId(orderId) && isSignedIn() && (existing().studentId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
+
+      allow create: if isValidId(orderId)
+        && isEmailVerified()
+        && isValidServiceOrder(incoming())
+        && incoming().studentId == request.auth.uid
+        && incoming().status in ['Active', 'Scheduled']
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(orderId)
+        && isEmailVerified()
+        && isValidServiceOrder(incoming())
+        && incoming().studentId == existing().studentId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().studentId == request.auth.uid
+            && !(existing().status in ['Completed', 'Cancelled'])
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'scheduleSlot', 'notes', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isValidId(orderId) && isAdmin();
+    }
+  }
+}

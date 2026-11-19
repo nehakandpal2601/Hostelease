@@ -1,0 +1,453 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Publicly visible non-PII user profile for students and PG/hostel owners on HostelEase.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "role": {
+          "type": "string",
+          "enum": ["student", "owner"]
+        },
+        "university": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "courseYear": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "emailVerified": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "role", "university", "emailVerified", "createdAt", "updatedAt"]
+    },
+    "UserPrivateContact": {
+      "title": "UserPrivateContact",
+      "description": "Strictly private PII contact information for a user (isolated from public reads).",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "guardianPhone": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["email", "phone", "updatedAt"]
+    },
+    "HostelListing": {
+      "title": "HostelListing",
+      "description": "Verified PG or Hostel accommodation listing in Dehradun with standardized comparison metrics.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "name": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 100
+        },
+        "locality": {
+          "type": "string",
+          "enum": ["Clement Town", "Dalanwala", "Rajpur Road", "Prem Nagar", "Bidholi", "Patel Nagar"]
+        },
+        "nearCampus": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "distanceKm": {
+          "type": "number"
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["Boys", "Girls", "Co-ed"]
+        },
+        "roomType": {
+          "type": "string",
+          "enum": ["Single Studio", "Twin Sharing", "Triple Sharing"]
+        },
+        "monthlyRent": {
+          "type": "number"
+        },
+        "securityDeposit": {
+          "type": "number"
+        },
+        "availableBeds": {
+          "type": "number"
+        },
+        "safetyScore": {
+          "type": "number"
+        },
+        "verificationStatus": {
+          "type": "string",
+          "enum": ["Verified", "Pending Verification"]
+        },
+        "isFeatured": {
+          "type": "boolean"
+        },
+        "imageUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "safetyFeatures": {
+          "type": "array"
+        },
+        "facilities": {
+          "type": "array"
+        },
+        "houseRules": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "avgRating": {
+          "type": "number"
+        },
+        "reviewCount": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "ownerName",
+        "name",
+        "locality",
+        "nearCampus",
+        "distanceKm",
+        "gender",
+        "roomType",
+        "monthlyRent",
+        "securityDeposit",
+        "availableBeds",
+        "safetyScore",
+        "verificationStatus",
+        "isFeatured",
+        "imageUrl",
+        "safetyFeatures",
+        "facilities",
+        "houseRules",
+        "description",
+        "avgRating",
+        "reviewCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PropertyReview": {
+      "title": "PropertyReview",
+      "description": "Verified student review and multi-dimensional rating for a PG/Hostel listing.",
+      "type": "object",
+      "properties": {
+        "listingId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "authorUniversity": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "overallRating": {
+          "type": "number"
+        },
+        "safetyRating": {
+          "type": "number"
+        },
+        "cleanlinessRating": {
+          "type": "number"
+        },
+        "foodWifiRating": {
+          "type": "number"
+        },
+        "valueRating": {
+          "type": "number"
+        },
+        "comment": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 800
+        },
+        "verifiedResident": {
+          "type": "boolean"
+        },
+        "bookingId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "listingId",
+        "authorId",
+        "authorName",
+        "authorUniversity",
+        "overallRating",
+        "safetyRating",
+        "cleanlinessRating",
+        "foodWifiRating",
+        "valueRating",
+        "comment",
+        "verifiedResident",
+        "bookingId",
+        "createdAt"
+      ]
+    },
+    "BookingEnquiry": {
+      "title": "BookingEnquiry",
+      "description": "Automated student visit request / bed reservation and ₹1,000 commission ledger record.",
+      "type": "object",
+      "properties": {
+        "studentId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "studentUniversity": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "studentPhone": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "listingId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "listingName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "moveInDate": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "roomType": {
+          "type": "string",
+          "enum": ["Single Studio", "Twin Sharing", "Triple Sharing"]
+        },
+        "monthlyRent": {
+          "type": "number"
+        },
+        "bookingType": {
+          "type": "string",
+          "enum": ["Schedule Visit", "Reserve Bed"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Pending Visit", "Visit Scheduled", "Confirmed", "Completed", "Cancelled"]
+        },
+        "commissionInr": {
+          "type": "number"
+        },
+        "variableCostInr": {
+          "type": "number"
+        },
+        "netContributionInr": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "studentId",
+        "studentName",
+        "studentUniversity",
+        "studentPhone",
+        "listingId",
+        "listingName",
+        "ownerId",
+        "moveInDate",
+        "roomType",
+        "monthlyRent",
+        "bookingType",
+        "status",
+        "commissionInr",
+        "variableCostInr",
+        "netContributionInr",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ServiceOrder": {
+      "title": "ServiceOrder",
+      "description": "Student daily campus service subscription/request (Tiffin, Laundry, Cleaning, Basic Repairs).",
+      "type": "object",
+      "properties": {
+        "studentId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "campusArea": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "serviceCategory": {
+          "type": "string",
+          "enum": ["Tiffin & Meals", "Campus Laundry", "Room Cleaning", "Basic Repairs"]
+        },
+        "planName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "monthlyPriceInr": {
+          "type": "number"
+        },
+        "scheduleSlot": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Active", "Scheduled", "Completed", "Cancelled"]
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "studentId",
+        "studentName",
+        "campusArea",
+        "serviceCategory",
+        "planName",
+        "monthlyPriceInr",
+        "scheduleSlot",
+        "status",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Publicly safe user profile metadata (no PII)."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateContact" },
+      "description": "Isolated PII contact details readable/writable only by the owning user or admin."
+    },
+    "/listings/{listingId}": {
+      "schema": { "$ref": "#/entities/HostelListing" },
+      "description": "Verified PG/Hostel listings in Dehradun."
+    },
+    "/listings/{listingId}/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/PropertyReview" },
+      "description": "Verified user reviews and ratings attached to a specific listing."
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/BookingEnquiry" },
+      "description": "Automated booking/visit requests and commission tracking records."
+    },
+    "/serviceOrders/{orderId}": {
+      "schema": { "$ref": "#/entities/ServiceOrder" },
+      "description": "Student daily campus service requests and active subscriptions."
+    }
+  }
+}
